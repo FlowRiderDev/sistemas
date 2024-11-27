@@ -1,0 +1,139 @@
+#include <Servo.h>
+
+// Declaração dos servos
+Servo servoClaw;
+Servo base;
+Servo vertical;
+Servo frontal;
+
+// Ângulos iniciais dos servos
+int anguloBase = 90;       // Base: 0-160 graus
+int anguloVertical = 0;   // Vertical: 0-80 graus
+int anguloClaw = 0;       // Garra: 0-45 graus
+int anguloFrontal = 0;    // Frontal: 0-50 graus
+
+// Incremento por passo
+const int incremento = 5;
+
+// Limites de movimento
+const int limiteBase = 160;
+const int limiteVertical = 80;
+const int limiteClaw = 45;
+const int limiteFrontal = 50;
+
+void setup() {
+  Serial.begin(9600);
+
+  // Conexão dos servos
+  servoClaw.attach(6); // Garra
+  base.attach(3);      // Base
+  vertical.attach(5);  // Movimento vertical
+  frontal.attach(4);   // Movimento frontal
+
+  // Inicialização dos ângulos
+  servoClaw.write(anguloClaw);
+  base.write(anguloBase);
+  vertical.write(anguloVertical);
+  frontal.write(anguloFrontal);
+
+  Serial.println("Pronto para receber comandos!");
+}
+
+void loop() {
+  if (Serial.available()) {
+    String data = Serial.readStringUntil('\n'); // Lê a lista enviada pelo Python
+    Serial.print("Comando recebido: ");
+    Serial.println(data);
+
+    int movimentos[7];
+    int index = 0;
+    int lastComma = 0;
+
+    // Divide a string recebida em valores inteiros
+    for (int i = 0; i < data.length(); i++) {
+      if (data[i] == ',' || i == data.length() - 1) {
+        String value = data.substring(lastComma, i + 1);
+        movimentos[index++] = value.toInt();
+        lastComma = i + 1;
+      }
+    }
+
+    if (index == 7) {
+      // Processar os comandos
+      moverBase(movimentos[1], movimentos[2]);       // Movimento lateral
+      moverVertical(movimentos[3], movimentos[4]);  // Movimento vertical
+      moverGarra(movimentos[0]);                    // Abrir/fechar a garra
+      moverFrontal(movimentos[5], movimentos[6]);   // Movimento frontal
+
+      // Enviar feedback ao Python
+      Serial.println("OK");
+    } else {
+      Serial.println("Erro: Comando inválido.");
+    }
+  }
+}
+
+// Função para mover a base
+void moverBase(int dirX, int stepsX) {
+  int target = anguloBase + (dirX == 1 ? stepsX * incremento : -stepsX * incremento);
+
+  // Limita o ângulo ao intervalo permitido
+  target = constrain(target, 0, limiteBase);
+
+  while (anguloBase != target) {
+    anguloBase += (anguloBase < target) ? incremento : -incremento;
+    base.write(anguloBase);
+    delay(15); // Pequeno delay para suavizar o movimento
+  }
+
+  Serial.print("Base movida para: ");
+  Serial.println(anguloBase);
+}
+
+// Função para mover o eixo vertical
+void moverVertical(int dirY, int stepsY) {
+  int target = anguloVertical + (dirY == 1 ? stepsY * incremento : -stepsY * incremento);
+
+  // Limita o ângulo ao intervalo permitido
+  target = constrain(target, 0, limiteVertical);
+
+  while (anguloVertical != target) {
+    anguloVertical += (anguloVertical < target) ? incremento : -incremento;
+    vertical.write(anguloVertical);
+    delay(15);
+  }
+
+  Serial.print("Vertical movido para: ");
+  Serial.println(anguloVertical);
+}
+
+// Função para abrir/fechar a garra
+void moverGarra(int handOpen) {
+  int target = handOpen == 1 ? limiteClaw : 0;
+
+  while (anguloClaw != target) {
+    anguloClaw += (anguloClaw < target) ? 1 : -1; // Incremento de 1 grau para movimentos mais precisos
+    servoClaw.write(anguloClaw);
+    delay(10);
+  }
+
+  Serial.print("Garra ");
+  Serial.println(handOpen == 1 ? "aberta" : "fechada");
+}
+
+// Função para mover o eixo frontal
+void moverFrontal(int dirZ, int stepsZ) {
+  int target = anguloFrontal + (dirZ == 1 ? stepsZ * incremento : -stepsZ * incremento);
+
+  // Limita o ângulo ao intervalo permitido
+  target = constrain(target, 0, limiteFrontal);
+
+  while (anguloFrontal != target) {
+    anguloFrontal += (anguloFrontal < target) ? incremento : -incremento;
+    frontal.write(anguloFrontal);
+    delay(15);
+  }
+
+  Serial.print("Frontal movido para: ");
+  Serial.println(anguloFrontal);
+}
